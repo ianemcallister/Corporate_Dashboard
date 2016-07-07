@@ -1,11 +1,13 @@
 'use strict';
 
-(function(){
+(function($log){
 
 class LoginComponent {
   constructor() {
     this.message = 'Hello';
+    console.log(this.message);
   }
+
 }
 
 angular.module('ahNutsApp')

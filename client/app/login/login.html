@@ -3,5 +3,26 @@
 	<h2 class='center'>Login</h2>
 	
 	<!--username Input-->
-	<valid-input></valid-input>
+	<valid-input controls='{ "title":"Username", "type":"text",
+							"requirnments": { "length":3 }
+					}'
+				 error='{ "message":"Invalid Username" }'
+				 credential=''>
+	</valid-input>
+
+	<!--password Input-->
+	<valid-input controls='{ "title":"Password", "type":"password",
+							"requirnments": { "length":3 }
+					}'
+				 error=''
+				 credential=''>
+	</valid-input>
+
+	<!--submit button-->
+	<valid-input controls='{ "type":"submit",
+							"requirnments": { "length":3 }
+					}'
+				 >
+	</valid-input>
+
 </div>
