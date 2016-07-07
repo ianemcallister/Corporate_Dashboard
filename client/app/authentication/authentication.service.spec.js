@@ -31,8 +31,8 @@ describe('Service: authentication', function () {
     expect(1).toEqual(1);
   });
 
-  it('should return an authentication state', function () {
-    expect(1).toEqual(1);
+  it('should return an authentication object or error', function () {
+     expect(typeof authentication.authenticateUser()).toEqual('object');
   });
 
 });
