@@ -16,6 +16,7 @@ console.log('testing cli');
 	console.log("got this from getDataController:", response);
 });*/
 
-MarketReceiptService.provideAll().then(function(response) {
+MarketReceiptService.provideAll({location:'bixby', employee:'kevin'}).then(function(response) {
 	console.log('from MarketReceiptService:', response);
 });
+
