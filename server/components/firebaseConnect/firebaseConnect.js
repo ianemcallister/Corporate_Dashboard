@@ -45,8 +45,13 @@ export function getRecords(path) {
 
 		rootParent.child(path).on("value", function(snapshot) {
 			
+			//distill the values
 			var values = snapshot.val();
-			console.log('values', values);
+
+			//log them to the user
+			console.log('snapshot values for', path, values);
+
+			//pass them back
 			resolve(values);
 
 		}, function(error) {
@@ -54,6 +59,17 @@ export function getRecords(path) {
 			reject(error);
 		});
 
+	});
+
+}
+
+export function moveRecords(record, origin, target) {
+	
+	//notifying the user
+	console.log('moving records', record, origin, target);
+
+	return new Promise(function(resolve, reject) {
+		resolve('moved the object');
 	});
 
 }
