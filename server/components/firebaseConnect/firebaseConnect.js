@@ -63,6 +63,22 @@ export function getRecords(path) {
 
 }
 
+export function removeRecord(path) {
+
+	return new Promise((resolve, reject) => {
+		resolve('removed: ' + path);
+	});
+
+}
+
+export function saveRecord(path, data) {
+
+	return new Promise((resolve, reject) => {
+		resolve('saved: ' + path);
+	});
+
+}
+
 export function moveRecords(record, origin, target) {
 	
 	//notifying the user

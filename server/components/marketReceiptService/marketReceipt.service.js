@@ -1,6 +1,14 @@
 
 var FirebaseConnect = require('../firebaseConnect/firebaseConnect');
 
+function _numInObject(anObject) {
+	let i = 0;
+	Object.keys(anObject).forEach(function(subObject) {
+		i++;
+	});
+	return i;
+}
+
 function _formatDate(time) {
 	//console.log(time);
 	var year = time.getFullYear();
@@ -37,66 +45,245 @@ function _currentDateTime() {
 	}
 }
 
+function _extractKey(thisObject) {
+	var returnKey;
+
+	Object.keys(thisObject).forEach(key => {
+		returnKey = key;
+	});
+
+	return returnKey;
+}
+
+function _becomesDueToFormatedDateTime(becomesDue) {
+
+	//extract the parts and return
+	return { 
+		date: _formatDate(new Date(becomesDue.year, (becomesDue.month - 1), becomesDue.day)), 
+		time: becomesDue.time 
+	};
+}
+
 function _isDue(becomesDue) {
 	var currentDateTime = _currentDateTime();
+	var formatedDueDate = _becomesDueToFormatedDateTime(becomesDue);
 
-	return true;
+	console.log('_isDue?', parseInt(formatedDueDate.date), parseInt(formatedDueDate.time), parseInt(currentDateTime.date), parseInt(currentDateTime.time), (parseInt(formatedDueDate.date) <= parseInt(currentDateTime.date) && parseInt(formatedDueDate.time) <= parseInt(currentDateTime.time)));
+
+	return (parseInt(formatedDueDate.date) <= parseInt(currentDateTime.date) && parseInt(formatedDueDate.time) <= parseInt(currentDateTime.time));
 }
 
 function _isPastDue(becomesDue) {
 	var currentDateTime = _currentDateTime();
+	var formatedDueDate = _becomesDueToFormatedDateTime(becomesDue);
 
-	return true;
+	console.log('_isPastDue?', parseInt(formatedDueDate.date), parseInt(currentDateTime.date), (parseInt(formatedDueDate.date) < parseInt(currentDateTime.date)));
+
+	//only need to check the date
+	return (parseInt(formatedDueDate.date) < parseInt(currentDateTime.date)); 
 }
 
 function _buildScheduledToDueMoves(scheduledEvents) {
 	//Determin if events need market receipts yet
 	var returnArray = [];
 
-	//check each scheduled event
-	Object.keys(scheduledEvents).forEach(key => {
-		var dueDate = scheduledEvents[key].becomesDue;
-		
-		//has the due date arrived?
-		if(_isDue(dueDate)) {
+	//make sure there are objects in the object to check
+	if(_numInObject(scheduledEvents) > 0) {
+
+		//check each scheduled event
+		Object.keys(scheduledEvents).forEach(key => {
+			var eventObject = {};
+			var dueDate = scheduledEvents[key].becomesDue;
 			
-			//is the receipt past due?
-			if(_isPastDue(dueDate)) {
+			//has the due date arrived?
+			if(_isDue(dueDate)) {
+				
+				//is the receipt past due?
+				if(_isPastDue(dueDate)) {
 
-				//if so do nothing (_buildScheduledToPastDueMoves will handle)
+					//if so do nothing (_buildScheduledToPastDueMoves will handle)
 
-			} else {
+				} else {
+					
+					//but if it is not past due, add it to the array
+					eventObject[key] = scheduledEvents[key];
+					returnArray.push(eventObject);
 
-				//but if it is not past due, add it to the array
-				returnArray.push(scheduledEvents[key]);
+				}
 
-			}
+			} //otherwise do nothing
+			
+		});
 
-		} //otherwise do nothing
-		
-	});
+	}
 
 	return returnArray;
 }
 
 function _buildScheduledToPastDueMoves(scheduledEvents) {
-	return [];
+	//Determin if events need market receipts yet
+	var returnArray = [];
+
+	//make sure there are objects in the object to check
+	if(_numInObject(scheduledEvents) > 0) {
+		
+		//check each scheduled event
+		Object.keys(scheduledEvents).forEach(key => {
+			var eventObject = {};
+			var dueDate = scheduledEvents[key].becomesDue;
+			
+			//has the due date arrived?
+			if(_isDue(dueDate)) {
+				
+				//is the receipt past due?
+				if(_isPastDue(dueDate)) {
+					
+					//but if it is past due, add it to the array
+					eventObject[key] = scheduledEvents[key];
+					returnArray.push(eventObject);
+
+				} else {
+					
+					//otherwise do nothing
+
+				}
+
+			} //otherwise do nothing
+			
+		});
+		
+	}
+
+	return returnArray;
 }
 
-function _buildDueToPastDueMoves(currentAndPast, scheduledToDueList) {
-	return [];
+function _buildDueToPastDueMoves(currentAndPast) {
+	var returnArray = [];
+
+	if(typeof currentAndPast.due !== 'undefined') {
+		
+		//make sure there are objects in the object to check
+		if(_numInObject(currentAndPast.due) > 0) {
+
+			//check each of the previously due receipts, are they past due now?
+			Object.keys(currentAndPast.due).forEach(key => {
+				var eventObject = {};
+				var dueDate = currentAndPast.due[key].becomesDue;
+
+				//is the receipt past due?
+				if(_isPastDue(dueDate)) {
+
+					//but if it is past due, add it to the array
+					eventObject[key] = currentAndPast.due[key];
+					returnArray.push(eventObject);
+
+				} 
+
+			});
+		
+		}
+
+	}
+
+	return returnArray;
 }
 
 function _applyScheduleUpdates(outgoing) {
-	return 1;
+	// transactions that must occure on the schedules model
+	var workArray = [];
+
+	//loop through all the transactions
+	outgoing.forEach(receipt => {
+
+		var path = 'schedule/future/' + _extractKey(receipt);
+		
+		//add the job to the array
+		workArray.push(
+			FirebaseConnect.removeRecord(path)
+		);
+
+	});
+
+	return workArray;
 }
 
 function _applyDueUpdates(incoming, outgoing) {
-	return 2;
+	// transactions that must occure on the schedules model
+	var workArray = [];
+
+	//start with the incoming transactions
+	incoming.forEach(receipt => {
+		var key = _extractKey(receipt);
+		var path = 'forms/market_receipts/due/' + key;
+		
+		//add the job to the array
+		workArray.push(
+			FirebaseConnect.saveRecord(path, receipt[key])
+		);
+
+	});
+
+	//then add outgoing transactions
+	outgoing.forEach(receipt => {
+
+		var path = 'forms/market_receipts/due/' + _extractKey(receipt);
+		
+		//add the job to the array
+		workArray.push(
+			FirebaseConnect.removeRecord(path)
+		);
+
+	});
+
+	return workArray;
 }
 
 function _applyPastDueUpdates(fromSchedule, fromDue) {
-	return 3;
+	// transactions that must occure on the schedules model
+	var workArray = [];
+
+	//start with the incoming transactions
+	fromSchedule.forEach(receipt => {
+		var key = _extractKey(receipt);
+		var path = 'forms/market_receipts/past_due/' + key;
+		
+		//add the job to the array
+		workArray.push(
+			FirebaseConnect.saveRecord(path, receipt[key])
+		);
+
+	});
+
+	//then add outgoing transactions
+	fromDue.forEach(receipt => {
+		var key = _extractKey(receipt);
+		var path = 'forms/market_receipts/past_due/' + key;
+		
+		//add the job to the array
+		workArray.push(
+			FirebaseConnect.saveRecord(path, receipt[key])
+		);
+
+	});
+
+	return workArray;
+}
+
+function _combineArrays(arraysArray) {
+	var masterArray = [];
+
+	//access the first layer
+	arraysArray.forEach(workArrays => {
+
+		workArrays.forEach(job => {
+
+			masterArray.push(job);
+
+		});
+
+	});
+
+	return masterArray;
 }
 
 function _getCurrentAndPastDue(location, employee) {
@@ -159,8 +346,12 @@ function _combineLists(currentAndPast, future) {
 		var dueUpdates = _applyDueUpdates(scheduledToDueList, dueToPastDueList);
 		var pastDueUpdates = _applyPastDueUpdates(scheduledToPastDueList, dueToPastDueList);
 
+		var allWork = _combineArrays([scheduledUpdates, dueUpdates, pastDueUpdates]);
+
 		//perform all work
-		Promise.all([scheduledUpdates, dueUpdates, pastDueUpdates]).then(response => {
+		Promise.all(allWork).then(response => {
+
+			console.log(response);
 
 			//update the due model
 			currentAndPast['due'] = response[1];
