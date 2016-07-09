@@ -81,10 +81,10 @@ function handleError(res, statusCode) {
 // Fetches and returns pertinant data
 export function marketReceipt(req, res) {
   //return new Promise(function(resolve, reject) { resolve('testing'); });
-  return MarketReceiptService.provideAll(req.body);
-  /*return MarketReceiptService.provideAll(req.body)
+  //return MarketReceiptService.provideAll(req.body);
+  return MarketReceiptService.provideAll(req.body)
     .then(respondWithResult(res, 201))
-    .catch(handleError(res));*/
+    .catch(handleError(res));
 }
 
 // Updates an existing GetData in the DB
