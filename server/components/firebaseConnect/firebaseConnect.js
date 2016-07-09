@@ -38,7 +38,7 @@ console.log('FIREBASE_ID', process.FIREBASE_ID);
 
 export function getRecords(path) {
 
-	console.log('getting records');
+	//console.log('getting records');
 
 	return new Promise(function(resolve, reject) {
 		//resolve('got it: ' + requirnments.db);
@@ -49,7 +49,7 @@ export function getRecords(path) {
 			var values = snapshot.val();
 
 			//log them to the user
-			console.log('snapshot values for', path, values);
+			//console.log('snapshot values for', path, values);
 
 			//pass them back
 			resolve(values);
