@@ -1,0 +1,38 @@
+<div>
+<!--Adding the buttons-->
+<div class="row">
+      <div class="col-xs-6">
+            <div class="row">
+                <div class="col-xs-3 btn btn-default dayBtn" ng-click='vm.toggleAll()'>
+                            {{vm.btnStates.allBtn.state.text}}
+                </div>
+                <div class="col-xs-3 btn dayBtn" ng-class=vm.btnStates.sun.classes ng-click='vm.toggleBtn("sun")'>
+                            {{vm.btnStates.sun.state.text}}
+                </div>
+                <div class="col-xs-3 btn dayBtn" ng-class=vm.btnStates.mon.classes ng-click='vm.toggleBtn("mon")'>
+                            {{vm.btnStates.mon.state.text}}
+                </div>
+                <div class="col-xs-3 btn dayBtn" ng-class=vm.btnStates.tue.classes ng-click='vm.toggleBtn("tue")'>
+                            {{vm.btnStates.tue.state.text}}
+                </div>
+          </div>
+    </div> 
+    <div class="col-xs-6">
+            <div class="row">
+                <div class="col-xs-3 btn dayBtn" ng-class=vm.btnStates.wed.classes ng-click='vm.toggleBtn("wed")'>
+                            {{vm.btnStates.wed.state.text}}   
+                </div>
+                <div class="col-xs-3 btn dayBtn" ng-class=vm.btnStates.thu.classes ng-click='vm.toggleBtn("thu")'>
+                            {{vm.btnStates.thu.state.text}}
+                </div>
+                <div class="col-xs-3 btn dayBtn" ng-class=vm.btnStates.fri.classes ng-click='vm.toggleBtn("fri")'>
+                            {{vm.btnStates.fri.state.text}}
+                </div>
+                <div class="col-xs-3 btn dayBtn" ng-class=vm.btnStates.sat.classes ng-click='vm.toggleBtn("sat")'>
+                            {{vm.btnStates.sat.state.text}}
+                </div>
+          </div>
+    </div>
+</div>
+
+</div>

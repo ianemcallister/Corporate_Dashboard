@@ -2,6 +2,10 @@
 
 var express = require('express');
 var controller = require('./getData.controller');
+var bodyParser = require('body-parser');
+
+//return the express object
+var app = express();
 
 //get the URL encoded parser
 var urlencodedParser = bodyParser.urlencoded({ extended: false });

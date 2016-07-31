@@ -1,5 +1,6 @@
 
-var FirebaseConnect = require('../firebaseConnect/firebaseConnect');
+//var FirebaseConnect = require('../firebaseConnect/firebaseConnect');
+//var SquareConnect = require('../squareConnect/squareConnect');
 
 function _numInObject(anObject) {
 	let i = 0;
@@ -55,6 +56,38 @@ function _extractKey(thisObject) {
 	return returnKey;
 }
 
+function _extractMarketId(receipt) {
+	var key = _extractKey(receipt);
+	//event
+	//|--->location
+	//		|->id
+
+	return receipt[key].event.location.id;
+}
+
+function _extractMarketParams(receipt) {
+	var key = _extractKey(receipt);
+	//event
+	//|--->schedule
+	//		|->date
+
+	var timezone = "08:00";
+	var dayStart = "00:00:00";
+	var dayEnd = "23:59:59"
+	var parameters = {
+		start: {
+			date: receipt[key].event.schedule.date,
+			time: (dayStart + "-" + timezone)
+		},
+		end: {
+			date: receipt[key].event.schedule.date,
+			time: (dayEnd + "-" + timezone)
+		}
+	};
+
+	return parameters
+}
+
 function _becomesDueToFormatedDateTime(becomesDue) {
 
 	//extract the parts and return
@@ -67,10 +100,15 @@ function _becomesDueToFormatedDateTime(becomesDue) {
 function _isDue(becomesDue) {
 	var currentDateTime = _currentDateTime();
 	var formatedDueDate = _becomesDueToFormatedDateTime(becomesDue);
+	var dateHasPassed = parseInt(formatedDueDate.date) < parseInt(currentDateTime.date);
+	var dateIsSame = (parseInt(formatedDueDate.date) == parseInt(currentDateTime.date));
+	var timeHasPassed = parseInt(formatedDueDate.time) <= parseInt(currentDateTime.time);
 
-	console.log('_isDue?', parseInt(formatedDueDate.date), parseInt(formatedDueDate.time), parseInt(currentDateTime.date), parseInt(currentDateTime.time), (parseInt(formatedDueDate.date) <= parseInt(currentDateTime.date) && parseInt(formatedDueDate.time) <= parseInt(currentDateTime.time)));
+	var evaluation = dateHasPassed || (dateIsSame && timeHasPassed);
+	
+	console.log('_isDue?', parseInt(formatedDueDate.date), parseInt(formatedDueDate.time), parseInt(currentDateTime.date), parseInt(currentDateTime.time), evaluation);
 
-	return (parseInt(formatedDueDate.date) <= parseInt(currentDateTime.date) && parseInt(formatedDueDate.time) <= parseInt(currentDateTime.time));
+	return evaluation;
 }
 
 function _isPastDue(becomesDue) {
@@ -81,6 +119,19 @@ function _isPastDue(becomesDue) {
 
 	//only need to check the date
 	return (parseInt(formatedDueDate.date) < parseInt(currentDateTime.date)); 
+}
+
+function _isASquareResponse(responseObject) {
+
+	//make sure it's an object
+	if(typeof responseObject == 'object') {
+
+		//make sure it's a square object
+		if(typeof responseObject.transactions !== 'undefined' || typeof responseObject.refunds !== 'undefined') return true;
+		else return false;
+
+	} else return false;
+
 }
 
 function _buildScheduledToDueMoves(scheduledEvents) {
@@ -215,10 +266,26 @@ function _applyDueUpdates(incoming, outgoing) {
 	incoming.forEach(receipt => {
 		var key = _extractKey(receipt);
 		var path = 'forms/market_receipts/due/' + key;
-		
-		//add the job to the array
+
+		//add the firebase job to the array
 		workArray.push(
 			FirebaseConnect.saveRecord(path, receipt[key])
+		);
+
+		console.log('marketReceipt from _applyDueUpdates:',receipt);
+
+		var marketId = _extractMarketId(receipt);
+		var marketParams = _extractMarketParams(receipt);
+
+		//receipt must be calculated, so add a square job to the array.
+		//first get the transaction
+		workArray.push(
+			SquareConnect.getData('transactions', marketId, marketParams) //type, id, parameters
+		);
+
+		//then get the refunds
+		workArray.push(
+			SquareConnect.getData('refunds', marketId, marketParams) //type, id, parameters
 		);
 
 	});
@@ -246,10 +313,26 @@ function _applyPastDueUpdates(fromSchedule, fromDue) {
 	fromSchedule.forEach(receipt => {
 		var key = _extractKey(receipt);
 		var path = 'forms/market_receipts/past_due/' + key;
-		
-		//add the job to the array
+
+		//add the firebase job to the array
 		workArray.push(
 			FirebaseConnect.saveRecord(path, receipt[key])
+		);
+
+		console.log('marketReceipt from _applyPastDueUpdates:',receipt);
+
+		var marketId = _extractMarketId(receipt);
+		var marketParams = _extractMarketParams(receipt);
+
+		//receipt must be calculated, so add a square job to the array.
+		//first get the transaction
+		workArray.push(
+			SquareConnect.getData('transactions', marketId, marketParams) //type, id, parameters
+		);
+
+		//then get the refunds
+		workArray.push(
+			SquareConnect.getData('refunds', marketId, marketParams) //type, id, parameters
 		);
 
 	});
@@ -275,8 +358,10 @@ function _combineArrays(arraysArray) {
 	//access the first layer
 	arraysArray.forEach(workArrays => {
 
+		//access the second layer
 		workArrays.forEach(job => {
 
+			//build the promise array
 			masterArray.push(job);
 
 		});
@@ -325,39 +410,220 @@ function _getFutureDue(location, employee) {
 
 }
 
+function _updateLocalModel(currentAndPast, future, scheduledToDueList, scheduledToPastDueList, dueToPastDueList) {
+
+	//execute scheduledToDueList moves
+	//execute scheduledToPastDueList moves
+	//execute dueToPastDueList moves
+
+	//return all the changes
+	return currentAndPast;
+}
+
+function _calculateTransactionAmount(allTenders) {
+	var totalSum = 0;
+
+	allTenders.forEach(tenderObject => {
+
+		totalSum += tenderObject.amount_money.amount;
+
+	});
+
+	return totalSum;
+}
+
+function _sumAllValues(valuesArray) {
+	var totalSum = 0;
+
+	valuesArray.forEach(value => {
+		totalSum += value;
+	});
+
+	return totalSum;
+}
+
+function _sumAllSquareRecords(newReceiptValues) {
+	//define local variable
+	var locationsHash = {};
+
+	//loop through all the collections
+	newReceiptValues.forEach(squareObject => {
+
+		//then loop through all the transactions
+		if(typeof squareObject.transactions !== 'undefined') {
+			squareObject.transactions.forEach(transaction => {
+
+				//compile list of locations
+				var transactionLocation = transaction.location_id;
+				var transactionAmount = _calculateTransactionAmount(transaction.tenders);
+
+				if(typeof locationsHash[transactionLocation] == 'undefined') {
+					locationsHash[transactionLocation] = {
+						sales: [],
+						refunds: []
+					};				
+				} else locationsHash[transactionLocation].sales.push(transactionAmount);
+
+				//notify the user of the findings
+				console.log(transaction);
+
+				//
+				
+			});
+
+		}
+
+		//or loop through all the refunds
+		if(typeof squareObject.refunds !== 'undefined') {
+			squareObject.refunds.forEach(transaction => {
+
+				//compile list of locations
+				var transactionLocation = transaction.location_id;
+				var transactionAmount = _calculateTransactionAmount(transaction.tenders);
+
+				if(typeof locationsHash[transactionLocation] == 'undefined') {
+					locationsHash[transactionLocation] = {
+						sales: [],
+						refunds: []
+					};				
+				} else locationsHash[transactionLocation].refunds.push(transactionAmount);
+
+				//notify the user of the findings
+				console.log(transaction);
+
+				//
+				
+			});
+
+		}
+
+	});
+
+	//sum up the arrays
+	Object.keys(locationsHash).forEach(key => {
+		locationsHash[key].sales = _sumAllValues(locationsHash[key].sales);
+		locationsHash[key].refunds = _sumAllValues(locationsHash[key].refunds);
+	});
+
+	return locationsHash;
+}
+
+//function _extractMarketName() {}
+function _extractEmployeeName() {
+	return {
+		name: "Kevin Luna",
+		details: "Scheduled to work"
+	}
+}
+
+function _calculateNetSales() {}
+function _calculateRent() {}
+function _calculatePay() {}
+function _collectExpenses() {}
+function _extractStartingBank() {}
+function _calculateNetProfits() {}
+
+function _buildNewReceipts(newReceiptValues, possibleMarkets) {
+	//define the return value
+	var allNewReceipts = [];
+
+	//distill all the square records
+	var distilledByLocation = _sumAllSquareRecords(newReceiptValues);
+
+	//loop through by location
+	Object.keys(distilledByLocation).forEach(location => {
+
+		var newLocation = {} 
+		var eventId;
+
+		//identify the eventId, and add the default values
+		possibleMarkets.forEach(option => {
+			var key = _extractKey(option);
+			if(option[key].event.location.id == location) {
+				eventId = key;
+				newLocation[eventId] = {
+					becomesDue: option[key].becomesDue,
+					event: option[key].event
+				};
+			}
+		});
+
+		//then build the suggestion values
+		newLocation[eventId].suggestions = {
+			marketName: newLocation[eventId].event.location.name,	//extract market name
+			scheduledEmployee: _extractEmployeeName(newLocation[eventId]),	//extract scheduled employee name
+			marketNet: _calculateNetSales(),			//calculate gross
+			marketRent: _calculateRent(),				//calcuate rent
+			employeePay: _calculatePay(),				//calculate employee pay
+			reimbursableExpenses: _collectExpenses(),	//collect expenses
+			startingBank: _extractStartingBank(),		//extract starting bank
+			netProfits: _calculateNetProfits()			//calculate total due to Ah-Nuts
+		};
+
+		//add the object to the list of items to be returned
+		allNewReceipts.push(newLocation)
+	});
+
+	return allNewReceipts;
+}
+
 function _combineLists(currentAndPast, future) {
 
 	//notify user
-	console.log('_combineLists.');
+	console.log('_combineLists.', currentAndPast, future);
 
 	//identify changes to bring lists up to date
 	var scheduledToDueList = _buildScheduledToDueMoves(future);
 	var scheduledToPastDueList = _buildScheduledToPastDueMoves(future);
 	var dueToPastDueList = _buildDueToPastDueMoves(currentAndPast);
 
+	//notify the user
 	console.log('scheduledToDueList', scheduledToDueList);
 	console.log('scheduledToPastDueList', scheduledToPastDueList);
 	console.log('dueToPastDueList', dueToPastDueList);
 
+	//build async work
+	var scheduledUpdates = _applyScheduleUpdates(scheduledToDueList);
+	var dueUpdates = _applyDueUpdates(scheduledToDueList, dueToPastDueList);
+	var pastDueUpdates = _applyPastDueUpdates(scheduledToPastDueList, dueToPastDueList);
+
+	//combine async work into single array with a parrallel array of keys
+	var allWork = _combineArrays([scheduledUpdates, dueUpdates, pastDueUpdates]);
+
+	//execute changes on local model
+	currentAndPast = _updateLocalModel(currentAndPast, future, scheduledToDueList, scheduledToPastDueList, dueToPastDueList);
+
 	//start async work 
 	return new Promise((resolve, reject) => {
-
-		var scheduledUpdates = _applyScheduleUpdates(scheduledToDueList);
-		var dueUpdates = _applyDueUpdates(scheduledToDueList, dueToPastDueList);
-		var pastDueUpdates = _applyPastDueUpdates(scheduledToPastDueList, dueToPastDueList);
-
-		var allWork = _combineArrays([scheduledUpdates, dueUpdates, pastDueUpdates]);
 
 		//perform all work
 		Promise.all(allWork).then(response => {
 
-			console.log(response);
+			//all updates to the model have been made and new values have been
+			//retreived from square, now we need to..
+			var newReceiptValues = [];
 
-			//update the due model
-			currentAndPast['due'] = response[1];
+			//extract the square results from all the responses
+			response.forEach(responseObject => {
 
-			//update the past_due model
-			currentAndPast['past_due'] = response[2];
+				//if it is a square object, add the results to the array
+				if(_isASquareResponse(responseObject)) newReceiptValues.push(responseObject);
+
+			});
+
+			//consolidate arrays of possible markets
+			var possibleMarkets = _combineArrays([scheduledToDueList, scheduledToPastDueList]);
+
+			//build the required new receipts from the new square models 
+			var newReceipts = _buildNewReceipts(newReceiptValues, scheduledToPastDueList);
+
+			//pass the new receipts along
+			return newReceipts;
+
+		}).then(newReceipts => {
+
+			//execute the last model updates
+			console.log('newReceipts', newReceipts);
 
 			//return the final object
 			resolve(currentAndPast);
@@ -391,6 +657,7 @@ export function provideAll(specifics) {
 			_combineLists(responses[0], responses[1]).then(result => {
 
 				resolve(result);
+
 			}).catch(e => {
 				console.log('error:', e);
 				reject(e);

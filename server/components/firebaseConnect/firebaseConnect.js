@@ -1,4 +1,4 @@
-'use static'
+'use strict';
 
 //setting up firebase
 var firebase = require("firebase");
